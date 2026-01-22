@@ -77,6 +77,8 @@ if [[ "$COLLATION_COUNT_BEFORE" -gt 0 ]]; then
     # Remove collation parameter from column definitions
     sed -i "s/, collation='[^']*'//g" "$MIGRATION_FILE"
     sed -i "s/collation='[^']*', //g" "$MIGRATION_FILE"
+    # Handle sa.Unicode(collation='...') -> sa.Unicode()
+    sed -i "s/(collation='[^']*')/()/g" "$MIGRATION_FILE"
 
     # Verify removal
     COLLATION_COUNT_AFTER=$(grep -c "collation=" "$MIGRATION_FILE" || echo "0")
