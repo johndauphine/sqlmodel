@@ -57,6 +57,14 @@ log "Current Alembic status:"
 alembic current 2>/dev/null || echo "  (no migrations applied yet)"
 
 # -----------------------------------------------------------------------------
+# Generate DDL SQL
+# -----------------------------------------------------------------------------
+DDL_FILE="migration_$(date '+%Y%m%d_%H%M%S').sql"
+log "Generating DDL SQL: $DDL_FILE"
+alembic upgrade head --sql > "$DDL_FILE"
+log "DDL SQL saved to: $WORK_DIR/$DDL_FILE"
+
+# -----------------------------------------------------------------------------
 # Apply migration
 # -----------------------------------------------------------------------------
 log "Applying migration to PostgreSQL..."
@@ -93,3 +101,4 @@ fi
 
 deactivate
 log "Step 4 complete: Migration applied"
+log "DDL SQL file: $WORK_DIR/$DDL_FILE"
