@@ -5,7 +5,17 @@ CREATE TABLE alembic_version (
     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
--- Running upgrade  -> 5130d337f062
+-- Running upgrade  -> ff4179b55c6b
+
+CREATE TABLE dw__stackoverflow2010__dbo.badges (
+    id SERIAL NOT NULL, 
+    userid INTEGER NOT NULL, 
+    name VARCHAR(50) NOT NULL, 
+    date TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    class INTEGER NOT NULL, 
+    tagbased BOOLEAN NOT NULL, 
+    CONSTRAINT badges_pkey PRIMARY KEY (id)
+);
 
 CREATE TABLE dw__stackoverflow2010__dbo.comments (
     id SERIAL NOT NULL, 
@@ -15,6 +25,21 @@ CREATE TABLE dw__stackoverflow2010__dbo.comments (
     score INTEGER, 
     userid INTEGER, 
     CONSTRAINT comments_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE dw__stackoverflow2010__dbo.linktypes (
+    id SERIAL NOT NULL, 
+    type VARCHAR(50) NOT NULL, 
+    CONSTRAINT linktypes_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE dw__stackoverflow2010__dbo.postlinks (
+    id SERIAL NOT NULL, 
+    postid INTEGER NOT NULL, 
+    relatedpostid INTEGER NOT NULL, 
+    linktypeid INTEGER NOT NULL, 
+    creationdate TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    CONSTRAINT postlinks_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE dw__stackoverflow2010__dbo.posts (
@@ -41,6 +66,12 @@ CREATE TABLE dw__stackoverflow2010__dbo.posts (
     CONSTRAINT posts_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE dw__stackoverflow2010__dbo.posttypes (
+    id SERIAL NOT NULL, 
+    type VARCHAR(50) NOT NULL, 
+    CONSTRAINT posttypes_pkey PRIMARY KEY (id)
+);
+
 CREATE TABLE dw__stackoverflow2010__dbo.users (
     id SERIAL NOT NULL, 
     creationdate TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
@@ -59,7 +90,23 @@ CREATE TABLE dw__stackoverflow2010__dbo.users (
     CONSTRAINT users_pkey PRIMARY KEY (id)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('5130d337f062') RETURNING alembic_version.version_num;
+CREATE TABLE dw__stackoverflow2010__dbo.votes (
+    id SERIAL NOT NULL, 
+    postid INTEGER NOT NULL, 
+    votetypeid INTEGER NOT NULL, 
+    creationdate TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+    userid INTEGER, 
+    bountyamount INTEGER, 
+    CONSTRAINT votes_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE dw__stackoverflow2010__dbo.votetypes (
+    id SERIAL NOT NULL, 
+    name VARCHAR(50) NOT NULL, 
+    CONSTRAINT votetypes_pkey PRIMARY KEY (id)
+);
+
+INSERT INTO alembic_version (version_num) VALUES ('ff4179b55c6b') RETURNING alembic_version.version_num;
 
 COMMIT;
 

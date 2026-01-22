@@ -1,11 +1,26 @@
 from typing import Optional
 import datetime
 
-from sqlalchemy import DateTime, Integer, PrimaryKeyConstraint, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, PrimaryKeyConstraint, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
+
+
+class Badges(Base):
+    __tablename__ = 'badges'
+    __table_args__ = (
+        PrimaryKeyConstraint('id', name='badges_pkey'),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
+
+    Id: Mapped[int] = mapped_column('id', Integer, primary_key=True)
+    UserId: Mapped[int] = mapped_column('userid', Integer, nullable=False)
+    Name: Mapped[str] = mapped_column('name', String(50), nullable=False)
+    Date: Mapped[datetime.datetime] = mapped_column('date', DateTime, nullable=False)
+    Class: Mapped[int] = mapped_column('class', Integer, nullable=False)
+    TagBased: Mapped[bool] = mapped_column('tagbased', Boolean, nullable=False)
 
 
 class Comments(Base):
@@ -21,6 +36,42 @@ class Comments(Base):
     Text_: Mapped[str] = mapped_column('Text', String(700), nullable=False)
     Score: Mapped[Optional[int]] = mapped_column('score', Integer)
     UserId: Mapped[Optional[int]] = mapped_column('userid', Integer)
+
+
+class LinkTypes(Base):
+    __tablename__ = 'linktypes'
+    __table_args__ = (
+        PrimaryKeyConstraint('id', name='linktypes_pkey'),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
+
+    Id: Mapped[int] = mapped_column('id', Integer, primary_key=True)
+    Type: Mapped[str] = mapped_column('type', String(50), nullable=False)
+
+
+class PostLinks(Base):
+    __tablename__ = 'postlinks'
+    __table_args__ = (
+        PrimaryKeyConstraint('id', name='postlinks_pkey'),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
+
+    Id: Mapped[int] = mapped_column('id', Integer, primary_key=True)
+    PostId: Mapped[int] = mapped_column('postid', Integer, nullable=False)
+    RelatedPostId: Mapped[int] = mapped_column('relatedpostid', Integer, nullable=False)
+    LinkTypeId: Mapped[int] = mapped_column('linktypeid', Integer, nullable=False)
+    CreationDate: Mapped[datetime.datetime] = mapped_column('creationdate', DateTime, nullable=False)
+
+
+class PostTypes(Base):
+    __tablename__ = 'posttypes'
+    __table_args__ = (
+        PrimaryKeyConstraint('id', name='posttypes_pkey'),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
+
+    Id: Mapped[int] = mapped_column('id', Integer, primary_key=True)
+    Type: Mapped[str] = mapped_column('type', String(50), nullable=False)
 
 
 class Posts(Base):
@@ -73,3 +124,29 @@ class Users(Base):
     Location: Mapped[Optional[str]] = mapped_column('location', String(100))
     WebsiteUrl: Mapped[Optional[str]] = mapped_column('websiteurl', String(200))
     AccountId: Mapped[Optional[int]] = mapped_column('accountid', Integer)
+
+
+class VoteTypes(Base):
+    __tablename__ = 'votetypes'
+    __table_args__ = (
+        PrimaryKeyConstraint('id', name='votetypes_pkey'),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
+
+    Id: Mapped[int] = mapped_column('id', Integer, primary_key=True)
+    Name: Mapped[str] = mapped_column('name', String(50), nullable=False)
+
+
+class Votes(Base):
+    __tablename__ = 'votes'
+    __table_args__ = (
+        PrimaryKeyConstraint('id', name='votes_pkey'),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
+
+    Id: Mapped[int] = mapped_column('id', Integer, primary_key=True)
+    PostId: Mapped[int] = mapped_column('postid', Integer, nullable=False)
+    VoteTypeId: Mapped[int] = mapped_column('votetypeid', Integer, nullable=False)
+    CreationDate: Mapped[datetime.datetime] = mapped_column('creationdate', DateTime, nullable=False)
+    UserId: Mapped[Optional[int]] = mapped_column('userid', Integer)
+    BountyAmount: Mapped[Optional[int]] = mapped_column('bountyamount', Integer)
