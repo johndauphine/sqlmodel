@@ -2,6 +2,7 @@
 # =============================================================================
 # 04-apply-migration.sh
 # Apply Alembic migration to PostgreSQL
+# Idempotent: skips if already at head
 # =============================================================================
 set -e
 
@@ -51,10 +52,39 @@ log "Activating virtual environment..."
 source venv/bin/activate
 
 # -----------------------------------------------------------------------------
-# Show current migration status
+# Check if already at head
 # -----------------------------------------------------------------------------
-log "Current Alembic status:"
-alembic current 2>/dev/null || echo "  (no migrations applied yet)"
+log "Checking migration status..."
+
+CURRENT=$(alembic current 2>/dev/null | grep -oE '^[a-f0-9]+' || echo "none")
+HEAD=$(alembic heads 2>/dev/null | grep -oE '^[a-f0-9]+' || echo "none")
+
+log "Current revision: $CURRENT"
+log "Head revision: $HEAD"
+
+if [[ "$CURRENT" == "$HEAD" && "$HEAD" != "none" ]]; then
+    log "Already at head - no migrations to apply"
+
+    # Still verify tables exist
+    log "Verifying tables in dbo schema..."
+    export PGPASSWORD="$PG_PASSWORD"
+    TABLES_RESULT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
+        -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbo' ORDER BY table_name;" 2>/dev/null)
+    unset PGPASSWORD
+
+    if [[ -n "$TABLES_RESULT" ]]; then
+        log "Tables in dbo schema:"
+        echo "$TABLES_RESULT" | while read -r table; do
+            if [[ -n "$table" ]]; then
+                echo "  - $table"
+            fi
+        done
+    fi
+
+    deactivate
+    log "Step 4 complete: Already up to date"
+    exit 0
+fi
 
 # -----------------------------------------------------------------------------
 # Generate DDL SQL

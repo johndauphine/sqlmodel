@@ -2,6 +2,7 @@
 # =============================================================================
 # 01-generate-models.sh
 # Generate SQLAlchemy models from MSSQL using sqlacodegen
+# Idempotent: skips if models.py already exists
 # =============================================================================
 set -e
 
@@ -29,6 +30,17 @@ urlencode() {
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
+
+# -----------------------------------------------------------------------------
+# Check if models.py already exists (idempotent)
+# -----------------------------------------------------------------------------
+if [[ -f "$WORK_DIR/models.py" ]]; then
+    TABLE_COUNT=$(grep -c "^class " "$WORK_DIR/models.py" || echo "0")
+    log "models.py already exists with $TABLE_COUNT table(s) - skipping generation"
+    log "To regenerate, delete $WORK_DIR/models.py first"
+    log "Step 1 complete: Models already exist"
+    exit 0
+fi
 
 # -----------------------------------------------------------------------------
 # Validate prerequisites
