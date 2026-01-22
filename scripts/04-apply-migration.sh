@@ -19,6 +19,11 @@ fi
 source "$SCRIPT_DIR/config.env"
 
 # -----------------------------------------------------------------------------
+# Derive target schema name: dw__<database>__<schema> (lowercase)
+# -----------------------------------------------------------------------------
+TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+
+# -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
 log() {
@@ -66,14 +71,14 @@ if [[ "$CURRENT" == "$HEAD" && "$HEAD" != "none" ]]; then
     log "Already at head - no migrations to apply"
 
     # Still verify tables exist
-    log "Verifying tables in dbo schema..."
+    log "Verifying tables in $TARGET_SCHEMA schema..."
     export PGPASSWORD="$PG_PASSWORD"
     TABLES_RESULT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
-        -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbo' ORDER BY table_name;" 2>/dev/null)
+        -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = '$TARGET_SCHEMA' ORDER BY table_name;" 2>/dev/null)
     unset PGPASSWORD
 
     if [[ -n "$TABLES_RESULT" ]]; then
-        log "Tables in dbo schema:"
+        log "Tables in $TARGET_SCHEMA schema:"
         echo "$TABLES_RESULT" | while read -r table; do
             if [[ -n "$table" ]]; then
                 echo "  - $table"
@@ -111,22 +116,22 @@ log "Current revision: $NEW_REVISION"
 # -----------------------------------------------------------------------------
 # List created tables
 # -----------------------------------------------------------------------------
-log "Verifying tables in dbo schema..."
+log "Verifying tables in $TARGET_SCHEMA schema..."
 
 export PGPASSWORD="$PG_PASSWORD"
 TABLES_RESULT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
-    -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbo' ORDER BY table_name;" 2>/dev/null)
+    -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = '$TARGET_SCHEMA' ORDER BY table_name;" 2>/dev/null)
 unset PGPASSWORD
 
 if [[ -n "$TABLES_RESULT" ]]; then
-    log "Tables created in dbo schema:"
+    log "Tables created in $TARGET_SCHEMA schema:"
     echo "$TABLES_RESULT" | while read -r table; do
         if [[ -n "$table" ]]; then
             echo "  - $table"
         fi
     done
 else
-    echo "WARNING: No tables found in dbo schema"
+    echo "WARNING: No tables found in $TARGET_SCHEMA schema"
 fi
 
 deactivate

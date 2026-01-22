@@ -99,19 +99,89 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Derive target schema name: dw__<database>__<schema> (lowercase)
+# -----------------------------------------------------------------------------
+TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+log "Target PostgreSQL schema: $TARGET_SCHEMA"
+
+# -----------------------------------------------------------------------------
 # Generate models
 # -----------------------------------------------------------------------------
 log "Running sqlacodegen..."
 eval $SQLACODEGEN_CMD
 
-if [[ -f "models.py" ]]; then
-    TABLE_COUNT=$(grep -c "^class " models.py || echo "0")
-    log "SUCCESS: Generated models.py with $TABLE_COUNT table(s)"
-    log "Output: $WORK_DIR/models.py"
-else
+if [[ ! -f "models.py" ]]; then
     echo "ERROR: Failed to generate models.py"
     exit 1
 fi
+
+# -----------------------------------------------------------------------------
+# Transform to lowercase and update schema
+# -----------------------------------------------------------------------------
+log "Transforming identifiers to lowercase..."
+
+python3 << PYTHON_SCRIPT
+import re
+
+with open('models.py', 'r') as f:
+    content = f.read()
+
+# Update schema from source to target
+content = re.sub(r"'schema': '[^']*'", "'schema': '$TARGET_SCHEMA'", content)
+
+# Convert table names to lowercase: __tablename__ = 'TableName' -> __tablename__ = 'tablename'
+content = re.sub(
+    r"__tablename__ = '([^']+)'",
+    lambda m: f"__tablename__ = '{m.group(1).lower()}'",
+    content
+)
+
+# Convert constraint names to lowercase: name='PK_TableName__Id' -> name='pk_tablename__id'
+content = re.sub(
+    r"name='([^']+)'",
+    lambda m: f"name='{m.group(1).lower()}'",
+    content
+)
+
+# Convert column references in PrimaryKeyConstraint to lowercase
+# PrimaryKeyConstraint('Id', ...) -> PrimaryKeyConstraint('id', ...)
+content = re.sub(
+    r"PrimaryKeyConstraint\('([^']+)'",
+    lambda m: f"PrimaryKeyConstraint('{m.group(1).lower()}'",
+    content
+)
+
+# Convert column names in mapped_column to lowercase identifiers
+# This handles: Mapped[...] = mapped_column(...) patterns
+# The actual column names are the Python attribute names, which we'll keep as-is
+# but we need to ensure the database sees lowercase names
+
+# Add explicit column name for each mapped_column to force lowercase in DB
+lines = content.split('\n')
+new_lines = []
+for line in lines:
+    # Match lines like: ColumnName: Mapped[type] = mapped_column(...)
+    match = re.match(r'^(\s+)(\w+): (Mapped\[.+\]) = mapped_column\((.*)$', line)
+    if match:
+        indent, col_name, type_hint, rest = match.groups()
+        col_lower = col_name.lower()
+        # Check if there's already a column name specified
+        if not rest.strip().startswith("'"):
+            # Add lowercase column name as first argument
+            line = f"{indent}{col_name}: {type_hint} = mapped_column('{col_lower}', {rest}"
+    new_lines.append(line)
+
+content = '\n'.join(new_lines)
+
+with open('models.py', 'w') as f:
+    f.write(content)
+
+print("Transformation complete")
+PYTHON_SCRIPT
+
+TABLE_COUNT=$(grep -c "^class " models.py || echo "0")
+log "SUCCESS: Generated models.py with $TABLE_COUNT table(s)"
+log "Output: $WORK_DIR/models.py"
 
 deactivate
 log "Step 1 complete: Models generated"

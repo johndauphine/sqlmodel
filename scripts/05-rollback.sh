@@ -18,6 +18,11 @@ fi
 source "$SCRIPT_DIR/config.env"
 
 # -----------------------------------------------------------------------------
+# Derive target schema name: dw__<database>__<schema> (lowercase)
+# -----------------------------------------------------------------------------
+TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+
+# -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
 log() {
@@ -89,17 +94,17 @@ log "Current Alembic status:"
 alembic current 2>/dev/null || echo "  (no migrations applied)"
 
 # -----------------------------------------------------------------------------
-# Optionally drop the dbo schema
+# Optionally drop the schema
 # -----------------------------------------------------------------------------
 if [[ "$DROP_SCHEMA" == "yes" || "$DROP_SCHEMA" == "--drop-schema" ]]; then
-    log "Dropping dbo schema..."
+    log "Dropping $TARGET_SCHEMA schema..."
 
     export PGPASSWORD="$PG_PASSWORD"
     psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
-        -c "DROP SCHEMA IF EXISTS dbo CASCADE;" 2>/dev/null
+        -c "DROP SCHEMA IF EXISTS $TARGET_SCHEMA CASCADE;" 2>/dev/null
     unset PGPASSWORD
 
-    log "Schema dbo dropped"
+    log "Schema $TARGET_SCHEMA dropped"
 fi
 
 # -----------------------------------------------------------------------------
@@ -107,18 +112,18 @@ fi
 # -----------------------------------------------------------------------------
 export PGPASSWORD="$PG_PASSWORD"
 TABLES_RESULT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
-    -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbo' ORDER BY table_name;" 2>/dev/null)
+    -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = '$TARGET_SCHEMA' ORDER BY table_name;" 2>/dev/null)
 unset PGPASSWORD
 
 if [[ -n "$TABLES_RESULT" ]]; then
-    log "Remaining tables in dbo schema:"
+    log "Remaining tables in $TARGET_SCHEMA schema:"
     echo "$TABLES_RESULT" | while read -r table; do
         if [[ -n "$table" ]]; then
             echo "  - $table"
         fi
     done
 else
-    log "No tables in dbo schema"
+    log "No tables in $TARGET_SCHEMA schema"
 fi
 
 deactivate
@@ -128,5 +133,5 @@ echo ""
 echo "Usage:"
 echo "  $0              # Rollback all migrations"
 echo "  $0 -1           # Rollback one revision"
-echo "  $0 base yes     # Rollback all and drop dbo schema"
+echo "  $0 base yes     # Rollback all and drop schema"
 echo "  $0 <revision>   # Rollback to specific revision"

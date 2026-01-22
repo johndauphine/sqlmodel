@@ -7,3 +7,6 @@ __pycache__/
 
 # Alembic config (contains credentials)
 alembic.ini
+
+# Timestamped migration files (keep only migration.sql)
+migration_*.sql

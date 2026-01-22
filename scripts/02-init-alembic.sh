@@ -189,14 +189,20 @@ else:
 ENVPY
 
 # -----------------------------------------------------------------------------
-# Create dbo schema in PostgreSQL
+# Derive target schema name: dw__<database>__<schema> (lowercase)
 # -----------------------------------------------------------------------------
-log "Creating dbo schema in PostgreSQL..."
+TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+log "Target PostgreSQL schema: $TARGET_SCHEMA"
+
+# -----------------------------------------------------------------------------
+# Create target schema in PostgreSQL
+# -----------------------------------------------------------------------------
+log "Creating schema '$TARGET_SCHEMA' in PostgreSQL..."
 
 export PGPASSWORD="$PG_PASSWORD"
 psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
-    -c "CREATE SCHEMA IF NOT EXISTS dbo;" 2>/dev/null || {
-    echo "WARNING: Could not create dbo schema (it may already exist)"
+    -c "CREATE SCHEMA IF NOT EXISTS $TARGET_SCHEMA;" 2>/dev/null || {
+    echo "WARNING: Could not create $TARGET_SCHEMA schema (it may already exist)"
 }
 unset PGPASSWORD
 
