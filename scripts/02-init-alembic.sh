@@ -77,13 +77,13 @@ fi
 # -----------------------------------------------------------------------------
 # Build PostgreSQL connection string
 # -----------------------------------------------------------------------------
-ENCODED_PG_PASSWORD=$(urlencode "$PG_PASSWORD")
-PG_URL="postgresql://${PG_USER}:${ENCODED_PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${PG_DATABASE}"
+ENCODED_PG_PASSWORD=$(urlencode "$TARGET_PG_PASSWORD")
+PG_URL="postgresql://${TARGET_PG_USER}:${ENCODED_PG_PASSWORD}@${TARGET_PG_HOST}:${TARGET_PG_PORT}/${TARGET_PG_DATABASE}"
 
 # For alembic.ini, escape % as %%
 PG_URL_INI=$(echo "$PG_URL" | sed 's/%/%%/g')
 
-log "PostgreSQL connection: ${PG_USER}@${PG_HOST}:${PG_PORT}/${PG_DATABASE}"
+log "Target PostgreSQL connection: ${TARGET_PG_USER}@${TARGET_PG_HOST}:${TARGET_PG_PORT}/${TARGET_PG_DATABASE}"
 
 # -----------------------------------------------------------------------------
 # Update alembic.ini with PostgreSQL connection
@@ -191,7 +191,7 @@ ENVPY
 # -----------------------------------------------------------------------------
 # Derive target schema name: dw__<database>__<schema> (lowercase)
 # -----------------------------------------------------------------------------
-TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+TARGET_SCHEMA="dw__${SOURCE_PG_DATABASE,,}__${SOURCE_PG_SCHEMA,,}"
 log "Target PostgreSQL schema: $TARGET_SCHEMA"
 
 # -----------------------------------------------------------------------------
@@ -199,8 +199,8 @@ log "Target PostgreSQL schema: $TARGET_SCHEMA"
 # -----------------------------------------------------------------------------
 log "Creating schema '$TARGET_SCHEMA' in PostgreSQL..."
 
-export PGPASSWORD="$PG_PASSWORD"
-psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
+export PGPASSWORD="$TARGET_PG_PASSWORD"
+psql -h "$TARGET_PG_HOST" -p "$TARGET_PG_PORT" -U "$TARGET_PG_USER" -d "$TARGET_PG_DATABASE" \
     -c "CREATE SCHEMA IF NOT EXISTS $TARGET_SCHEMA;" 2>/dev/null || {
     echo "WARNING: Could not create $TARGET_SCHEMA schema (it may already exist)"
 }

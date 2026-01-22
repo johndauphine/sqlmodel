@@ -20,7 +20,7 @@ source "$SCRIPT_DIR/config.env"
 # -----------------------------------------------------------------------------
 # Derive target schema name: dw__<database>__<schema> (lowercase)
 # -----------------------------------------------------------------------------
-TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+TARGET_SCHEMA="dw__${SOURCE_PG_DATABASE,,}__${SOURCE_PG_SCHEMA,,}"
 
 # -----------------------------------------------------------------------------
 # Helper functions
@@ -99,8 +99,8 @@ alembic current 2>/dev/null || echo "  (no migrations applied)"
 if [[ "$DROP_SCHEMA" == "yes" || "$DROP_SCHEMA" == "--drop-schema" ]]; then
     log "Dropping $TARGET_SCHEMA schema..."
 
-    export PGPASSWORD="$PG_PASSWORD"
-    psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
+    export PGPASSWORD="$TARGET_PG_PASSWORD"
+    psql -h "$TARGET_PG_HOST" -p "$TARGET_PG_PORT" -U "$TARGET_PG_USER" -d "$TARGET_PG_DATABASE" \
         -c "DROP SCHEMA IF EXISTS $TARGET_SCHEMA CASCADE;" 2>/dev/null
     unset PGPASSWORD
 
@@ -110,8 +110,8 @@ fi
 # -----------------------------------------------------------------------------
 # Show remaining tables
 # -----------------------------------------------------------------------------
-export PGPASSWORD="$PG_PASSWORD"
-TABLES_RESULT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DATABASE" \
+export PGPASSWORD="$TARGET_PG_PASSWORD"
+TABLES_RESULT=$(psql -h "$TARGET_PG_HOST" -p "$TARGET_PG_PORT" -U "$TARGET_PG_USER" -d "$TARGET_PG_DATABASE" \
     -t -c "SELECT table_name FROM information_schema.tables WHERE table_schema = '$TARGET_SCHEMA' ORDER BY table_name;" 2>/dev/null)
 unset PGPASSWORD
 

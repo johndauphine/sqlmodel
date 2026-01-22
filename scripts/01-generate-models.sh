@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # 01-generate-models.sh
-# Generate SQLAlchemy models from MSSQL using sqlacodegen
+# Generate SQLAlchemy models from PostgreSQL using sqlacodegen
 # Idempotent: skips if models.py already exists
 # =============================================================================
 set -e
@@ -73,35 +73,35 @@ source venv/bin/activate
 # -----------------------------------------------------------------------------
 # Install dependencies
 # -----------------------------------------------------------------------------
-log "Installing sqlacodegen and pymssql..."
+log "Installing sqlacodegen and psycopg2-binary..."
 pip install --quiet --upgrade pip
-pip install --quiet sqlacodegen pymssql
+pip install --quiet sqlacodegen psycopg2-binary
 
 # -----------------------------------------------------------------------------
 # Build connection string
 # -----------------------------------------------------------------------------
-ENCODED_PASSWORD=$(urlencode "$MSSQL_PASSWORD")
-MSSQL_URL="mssql+pymssql://${MSSQL_USER}:${ENCODED_PASSWORD}@${MSSQL_HOST}:${MSSQL_PORT}/${MSSQL_DATABASE}"
+ENCODED_PASSWORD=$(urlencode "$SOURCE_PG_PASSWORD")
+SOURCE_URL="postgresql+psycopg2://${SOURCE_PG_USER}:${ENCODED_PASSWORD}@${SOURCE_PG_HOST}:${SOURCE_PG_PORT}/${SOURCE_PG_DATABASE}"
 
-log "MSSQL connection: ${MSSQL_USER}@${MSSQL_HOST}:${MSSQL_PORT}/${MSSQL_DATABASE}"
+log "Source PostgreSQL connection: ${SOURCE_PG_USER}@${SOURCE_PG_HOST}:${SOURCE_PG_PORT}/${SOURCE_PG_DATABASE}"
 
 # -----------------------------------------------------------------------------
 # Build sqlacodegen command
 # -----------------------------------------------------------------------------
-SQLACODEGEN_CMD="sqlacodegen '$MSSQL_URL' --schemas $MSSQL_SCHEMA --outfile models.py"
+SQLACODEGEN_CMD="sqlacodegen '$SOURCE_URL' --schemas $SOURCE_PG_SCHEMA --outfile models.py"
 
 # Add --tables flag if not migrating all tables
 if [[ "$TABLES" != "all" ]]; then
-    SQLACODEGEN_CMD="sqlacodegen '$MSSQL_URL' --schemas $MSSQL_SCHEMA --tables $TABLES --outfile models.py"
+    SQLACODEGEN_CMD="sqlacodegen '$SOURCE_URL' --schemas $SOURCE_PG_SCHEMA --tables $TABLES --outfile models.py"
     log "Generating models for tables: $TABLES"
 else
-    log "Generating models for all tables in schema: $MSSQL_SCHEMA"
+    log "Generating models for all tables in schema: $SOURCE_PG_SCHEMA"
 fi
 
 # -----------------------------------------------------------------------------
 # Derive target schema name: dw__<database>__<schema> (lowercase)
 # -----------------------------------------------------------------------------
-TARGET_SCHEMA="dw__${MSSQL_DATABASE,,}__${MSSQL_SCHEMA,,}"
+TARGET_SCHEMA="dw__${SOURCE_PG_DATABASE,,}__${SOURCE_PG_SCHEMA,,}"
 log "Target PostgreSQL schema: $TARGET_SCHEMA"
 
 # -----------------------------------------------------------------------------

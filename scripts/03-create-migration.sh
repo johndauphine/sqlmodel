@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # 03-create-migration.sh
-# Generate Alembic migration and remove MSSQL-specific collations
+# Generate Alembic migration
 # Idempotent: applies pending migrations first, skips if no schema changes
 # =============================================================================
 set -e
@@ -68,7 +68,7 @@ fi
 # -----------------------------------------------------------------------------
 # Check if schema changes are needed
 # -----------------------------------------------------------------------------
-MIGRATION_MSG="${1:-Initial schema migration from MSSQL}"
+MIGRATION_MSG="${1:-Initial schema migration}"
 
 log "Checking for schema differences..."
 
@@ -126,15 +126,12 @@ if [[ "$HAS_OPERATIONS" -eq 0 ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Remove MSSQL-specific collations
+# Remove collations (if any)
 # -----------------------------------------------------------------------------
-log "Removing MSSQL-specific collations..."
-
-# Count collations before removal
 COLLATION_COUNT_BEFORE=$(grep -c "collation=" "$MIGRATION_FILE" || true)
 
 if [[ "$COLLATION_COUNT_BEFORE" -gt 0 ]]; then
-    log "Found $COLLATION_COUNT_BEFORE collation reference(s) to remove"
+    log "Found $COLLATION_COUNT_BEFORE collation reference(s) to remove..."
 
     # Remove collation parameter from column definitions
     sed -i "s/, collation='[^']*'//g" "$MIGRATION_FILE"
@@ -151,8 +148,6 @@ if [[ "$COLLATION_COUNT_BEFORE" -gt 0 ]]; then
     else
         log "All collations removed successfully"
     fi
-else
-    log "No collations found (none to remove)"
 fi
 
 # -----------------------------------------------------------------------------
