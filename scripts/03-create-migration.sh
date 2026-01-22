@@ -100,8 +100,8 @@ log "Migration created successfully"
 log "File: $MIGRATION_FILE"
 
 # Count operations
-CREATE_TABLE_COUNT=$(grep -c "op.create_table" "$MIGRATION_FILE" || echo "0")
-CREATE_INDEX_COUNT=$(grep -c "op.create_index" "$MIGRATION_FILE" || echo "0")
+CREATE_TABLE_COUNT=$(grep -c "op.create_table" "$MIGRATION_FILE" || true)
+CREATE_INDEX_COUNT=$(grep -c "op.create_index" "$MIGRATION_FILE" || true)
 
 log "Summary: $CREATE_TABLE_COUNT table(s), $CREATE_INDEX_COUNT index(es)"
 
