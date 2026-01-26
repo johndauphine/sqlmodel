@@ -151,6 +151,34 @@ content = re.sub(
     content
 )
 
+# Convert ForeignKeyConstraint columns and references to lowercase
+# ForeignKeyConstraint(['ColName'], ['schema.Table.Col'], ...) -> ForeignKeyConstraint(['colname'], ['target_schema.table.col'], ...)
+def transform_fk(match):
+    cols = match.group(1)  # e.g., 'ColName' or 'Col1', 'Col2'
+    refs = match.group(2)  # e.g., 'schema.Table.Col'
+    rest = match.group(3)  # e.g., , name='...')
+
+    # Lowercase column names
+    cols_lower = re.sub(r"'([^']+)'", lambda m: f"'{m.group(1).lower()}'", cols)
+
+    # Transform references: update schema and lowercase table.column
+    def transform_ref(m):
+        ref = m.group(1)  # e.g., 'schema.Table.Col'
+        parts = ref.split('.')
+        if len(parts) == 3:
+            # schema.table.column -> target_schema.table.column (all lowercase except target schema pattern)
+            return f"'$TARGET_SCHEMA.{parts[1].lower()}.{parts[2].lower()}'"
+        return f"'{ref.lower()}'"
+
+    refs_transformed = re.sub(r"'([^']+)'", transform_ref, refs)
+    return f"ForeignKeyConstraint([{cols_lower}], [{refs_transformed}]{rest}"
+
+content = re.sub(
+    r"ForeignKeyConstraint\(\[([^\]]+)\], \[([^\]]+)\](.*?)\)",
+    transform_fk,
+    content
+)
+
 # Convert column names in mapped_column to lowercase identifiers
 # This handles: Mapped[...] = mapped_column(...) patterns
 # The actual column names are the Python attribute names, which we'll keep as-is
