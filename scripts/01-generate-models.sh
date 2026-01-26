@@ -2,11 +2,29 @@
 # =============================================================================
 # 01-generate-models.sh
 # Generate SQLAlchemy models from PostgreSQL using sqlacodegen
-# Idempotent: skips if models.py already exists
+# Idempotent: skips if models.py already exists (use --force to regenerate)
 # =============================================================================
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# -----------------------------------------------------------------------------
+# Parse arguments
+# -----------------------------------------------------------------------------
+FORCE_REGENERATE=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force|-f)
+            FORCE_REGENERATE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--force|-f]"
+            exit 1
+            ;;
+    esac
+done
 
 # -----------------------------------------------------------------------------
 # Load configuration
@@ -32,14 +50,19 @@ log() {
 }
 
 # -----------------------------------------------------------------------------
-# Check if models.py already exists (idempotent)
+# Check if models.py already exists (idempotent, unless --force)
 # -----------------------------------------------------------------------------
 if [[ -f "$WORK_DIR/models.py" ]]; then
-    TABLE_COUNT=$(grep -c "^class " "$WORK_DIR/models.py" || echo "0")
-    log "models.py already exists with $TABLE_COUNT table(s) - skipping generation"
-    log "To regenerate, delete $WORK_DIR/models.py first"
-    log "Step 1 complete: Models already exist"
-    exit 0
+    if [[ "$FORCE_REGENERATE" == "true" ]]; then
+        log "Force regeneration requested - removing existing models.py"
+        rm "$WORK_DIR/models.py"
+    else
+        TABLE_COUNT=$(grep -c "^class " "$WORK_DIR/models.py" || echo "0")
+        log "models.py already exists with $TABLE_COUNT table(s) - skipping generation"
+        log "To regenerate, use --force flag or delete $WORK_DIR/models.py"
+        log "Step 1 complete: Models already exist"
+        exit 0
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -171,7 +194,7 @@ def transform_fk(match):
         return f"'{ref.lower()}'"
 
     refs_transformed = re.sub(r"'([^']+)'", transform_ref, refs)
-    return f"ForeignKeyConstraint([{cols_lower}], [{refs_transformed}]{rest}"
+    return f"ForeignKeyConstraint([{cols_lower}], [{refs_transformed}]{rest})"
 
 content = re.sub(
     r"ForeignKeyConstraint\(\[([^\]]+)\], \[([^\]]+)\](.*?)\)",
