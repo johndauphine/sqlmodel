@@ -2,29 +2,11 @@
 # =============================================================================
 # 01-generate-models.sh
 # Generate SQLAlchemy models from PostgreSQL using sqlacodegen
-# Idempotent: skips if models.py already exists (use --force to regenerate)
+# Always regenerates models to capture source schema changes
 # =============================================================================
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# -----------------------------------------------------------------------------
-# Parse arguments
-# -----------------------------------------------------------------------------
-FORCE_REGENERATE=false
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --force|-f)
-            FORCE_REGENERATE=true
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Usage: $0 [--force|-f]"
-            exit 1
-            ;;
-    esac
-done
 
 # -----------------------------------------------------------------------------
 # Load configuration
@@ -50,19 +32,11 @@ log() {
 }
 
 # -----------------------------------------------------------------------------
-# Check if models.py already exists (idempotent, unless --force)
+# Remove existing models.py to ensure fresh generation from source
 # -----------------------------------------------------------------------------
 if [[ -f "$WORK_DIR/models.py" ]]; then
-    if [[ "$FORCE_REGENERATE" == "true" ]]; then
-        log "Force regeneration requested - removing existing models.py"
-        rm "$WORK_DIR/models.py"
-    else
-        TABLE_COUNT=$(grep -c "^class " "$WORK_DIR/models.py" || echo "0")
-        log "models.py already exists with $TABLE_COUNT table(s) - skipping generation"
-        log "To regenerate, use --force flag or delete $WORK_DIR/models.py"
-        log "Step 1 complete: Models already exist"
-        exit 0
-    fi
+    log "Regenerating models from source schema..."
+    rm "$WORK_DIR/models.py"
 fi
 
 # -----------------------------------------------------------------------------

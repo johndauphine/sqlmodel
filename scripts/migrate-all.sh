@@ -2,30 +2,11 @@
 # =============================================================================
 # migrate-all.sh
 # Orchestrator script that runs the full migration pipeline
-# Usage: ./migrate-all.sh [--force|-f]
-#   --force: Regenerate models even if models.py exists (for schema changes)
+# Models are always regenerated to capture source schema changes
 # =============================================================================
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# -----------------------------------------------------------------------------
-# Parse arguments
-# -----------------------------------------------------------------------------
-FORCE_FLAG=""
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --force|-f)
-            FORCE_FLAG="--force"
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Usage: $0 [--force|-f]"
-            exit 1
-            ;;
-    esac
-done
 
 # -----------------------------------------------------------------------------
 # Helper functions
@@ -87,10 +68,6 @@ echo "  Schema: $TARGET_SCHEMA"
 echo ""
 echo "Tables: $TABLES"
 echo "Working directory: $WORK_DIR"
-if [[ -n "$FORCE_FLAG" ]]; then
-    echo ""
-    echo "Mode: FORCE (will regenerate models from source)"
-fi
 echo ""
 echo "=========================================="
 echo ""
@@ -119,7 +96,7 @@ echo ""
 echo "=========================================="
 echo "Step 1/4: Generate SQLAlchemy models"
 echo "=========================================="
-"$SCRIPT_DIR/01-generate-models.sh" $FORCE_FLAG || error_exit 1
+"$SCRIPT_DIR/01-generate-models.sh" || error_exit 1
 echo ""
 
 # Step 2: Initialize Alembic
