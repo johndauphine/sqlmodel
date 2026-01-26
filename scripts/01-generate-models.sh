@@ -32,11 +32,14 @@ log() {
 }
 
 # -----------------------------------------------------------------------------
-# Remove existing models.py to ensure fresh generation from source
+# Backup existing models.py before regenerating
 # -----------------------------------------------------------------------------
+TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 if [[ -f "$WORK_DIR/models.py" ]]; then
-    log "Regenerating models from source schema..."
+    log "Backing up existing models.py..."
+    cp "$WORK_DIR/models.py" "$WORK_DIR/models_${TIMESTAMP}.py.bak"
     rm "$WORK_DIR/models.py"
+    log "Backup saved: models_${TIMESTAMP}.py.bak"
 fi
 
 # -----------------------------------------------------------------------------
@@ -117,11 +120,26 @@ fi
 # -----------------------------------------------------------------------------
 log "Transforming identifiers to lowercase..."
 
+GENERATION_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+
 python3 << PYTHON_SCRIPT
 import re
+from datetime import datetime
 
 with open('models.py', 'r') as f:
     content = f.read()
+
+# Add generation header comment
+header = '''# =============================================================================
+# Auto-generated SQLAlchemy models
+# Generated: $GENERATION_TIME
+# Source: $SOURCE_PG_DATABASE.$SOURCE_PG_SCHEMA
+# Target: $TARGET_SCHEMA
+# Tables: $TABLES
+# =============================================================================
+
+'''
+content = header + content
 
 # Update schema from source to target
 content = re.sub(r"'schema': '[^']*'", "'schema': '$TARGET_SCHEMA'", content)
