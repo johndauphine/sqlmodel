@@ -25,7 +25,7 @@ Source PostgreSQL          Target PostgreSQL
 
 ### Step 1: Generate Models (`01-generate-models.sh`)
 
-Uses sqlacodegen to reverse-engineer the source database:
+Models are **always regenerated** from source to capture any schema changes. Uses sqlacodegen to reverse-engineer the source database:
 
 ```bash
 sqlacodegen 'postgresql+psycopg2://user:pass@host:port/database' \
@@ -147,16 +147,30 @@ CREATE TABLE dw__stackoverflow2010__dbo.users (
 COMMIT;
 ```
 
-## Idempotency
+## Schema Change Detection
 
-Scripts handle repeated runs gracefully:
+The pipeline automatically detects source schema changes:
 
 | Scenario | Behavior |
 |----------|----------|
-| models.py exists | Skip generation |
-| Alembic initialized | Update config only |
-| No schema changes | Remove empty migration |
+| Source unchanged | Models regenerated, no migration needed |
+| New table added | Migration creates the table |
+| Column added | Migration adds the column |
+| Column removed | Migration drops the column |
 | Already at head | Skip apply |
+
+Models are always regenerated from source (~3-5 seconds) to ensure changes are captured. Alembic then compares models against the target and creates incremental migrations.
+
+### Example: Handling Schema Changes
+
+```bash
+# Add column to source
+psql -d SourceDB -c "ALTER TABLE dbo.Users ADD COLUMN Email VARCHAR(100)"
+
+# Run migration - automatically detects the change
+./scripts/migrate-all.sh
+# Output: "Detected added column 'dw__sourcedb__dbo.users.email'"
+```
 
 ## Troubleshooting
 

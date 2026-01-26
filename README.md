@@ -9,10 +9,11 @@ This toolkit generates SQLAlchemy models from a source PostgreSQL database and c
 **Key Features:**
 - Automated model generation using sqlacodegen
 - Alembic-based schema migrations
+- Automatic detection of source schema changes
 - Lowercase table/column/constraint names in target
 - Foreign key relationships preserved and transformed
 - Configurable table selection
-- Idempotent scripts (safe to run multiple times)
+- Incremental migrations (only changes are migrated)
 - Rollback support
 
 ## Quick Start
@@ -161,12 +162,25 @@ The model generation script automatically transforms identifiers for the target 
 
 Python attribute names are preserved as PascalCase for code readability while database identifiers use lowercase.
 
-## Idempotency
+## Schema Change Detection
 
-All scripts are idempotent and can be run multiple times safely:
-- Models are skipped if `models.py` exists
-- Empty migrations are automatically removed
-- Already-applied migrations are skipped
+The pipeline automatically detects and handles source schema changes:
+
+| Scenario | Behavior |
+|----------|----------|
+| **No changes** | Models regenerated, empty migration removed, "Already in sync" |
+| **New table** | Migration creates the new table |
+| **New column** | Migration adds the column |
+| **Dropped column** | Migration removes the column |
+| **Type change** | Migration alters the column type |
+
+Models are always regenerated from source to ensure changes are captured. Alembic then compares models against the target database and creates incremental migrations.
+
+```bash
+# Example: Add column to source, then migrate
+psql -d SourceDB -c "ALTER TABLE dbo.Users ADD COLUMN Email VARCHAR(100)"
+./scripts/migrate-all.sh  # Automatically detects and migrates the new column
+```
 
 ## Prerequisites
 

@@ -87,12 +87,13 @@ Example: `StackOverflow2010.dbo` -> `dw__stackoverflow2010__dbo`
 3. **03-create-migration.sh**: Runs alembic autogenerate, removes empty migrations
 4. **04-apply-migration.sh**: Generates DDL, applies migration, verifies tables
 
-### Idempotency
+### Schema Change Detection
 
-All scripts are idempotent:
-- Skip if models.py exists
-- Skip if already at head
-- Remove empty migrations automatically
+Models are always regenerated from source to capture schema changes:
+- Alembic compares models to target database
+- Creates incremental migrations for differences
+- Removes empty migrations if no changes detected
+- Skips apply if already at head
 
 ### Generated Artifacts
 
@@ -117,9 +118,13 @@ Models use SQLAlchemy 2.0 syntax:
 ## Testing
 
 ```bash
-# Test idempotency
+# Test no-change detection
 ./scripts/migrate-all.sh  # Run once
-./scripts/migrate-all.sh  # Run again - should skip
+./scripts/migrate-all.sh  # Run again - should report "Already in sync"
+
+# Test schema change detection
+psql -d SourceDB -c "ALTER TABLE dbo.Users ADD COLUMN Email VARCHAR(100)"
+./scripts/migrate-all.sh  # Should detect and migrate new column
 
 # Test rollback cycle
 ./scripts/05-rollback.sh base yes

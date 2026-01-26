@@ -282,7 +282,7 @@ Third run:  No changes                 → No migration generated
 
 This enables:
 - **Continuous sync**: Keep target in sync with evolving source
-- **Safe re-runs**: Idempotent operations
+- **Safe re-runs**: Models always regenerated, empty migrations removed
 - **Selective updates**: Apply specific migrations
 
 ### 5. Pre-Deployment Validation
@@ -454,12 +454,18 @@ git add alembic/versions/*.py
 git commit -m "Add migration for new tables"
 ```
 
-### 6. Use Idempotent Scripts
+### 6. Automatic Schema Change Detection
 
-All scripts in this toolkit are idempotent:
+Models are always regenerated from source to capture changes:
 - Safe to run multiple times
-- Skip already-completed steps
-- No duplicate migrations
+- Empty migrations automatically removed
+- Only actual changes create migrations
+
+```bash
+# Add column to source, then run migration
+psql -d SourceDB -c "ALTER TABLE dbo.Users ADD COLUMN Email VARCHAR(100)"
+./scripts/migrate-all.sh  # Detects and migrates the new column
+```
 
 ### 7. Document Schema Transformations
 
