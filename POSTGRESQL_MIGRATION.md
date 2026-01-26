@@ -114,11 +114,20 @@ TABLES=all
 ### models.py
 
 SQLAlchemy 2.0 models with:
+- Generation timestamp header
 - `Mapped` type annotations
 - Lowercase column names in database
 - PascalCase Python attribute names
 
 ```python
+# =============================================================================
+# Auto-generated SQLAlchemy models
+# Generated: 2026-01-26 17:34:43
+# Source: StackOverflow2010.dbo
+# Target: dw__stackoverflow2010__dbo
+# Tables: Users,Posts
+# =============================================================================
+
 class Users(Base):
     __tablename__ = 'users'
     __table_args__ = (
@@ -129,6 +138,8 @@ class Users(Base):
     Id: Mapped[int] = mapped_column('id', Integer, Identity(), primary_key=True)
     DisplayName: Mapped[str] = mapped_column('displayname', VARCHAR(40), nullable=False)
 ```
+
+Previous versions are automatically backed up as `models_<timestamp>.py.bak`.
 
 ### migration.sql
 

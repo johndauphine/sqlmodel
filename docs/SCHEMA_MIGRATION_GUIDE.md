@@ -95,9 +95,10 @@ Source Database ──► sqlacodegen ──► SQLAlchemy Models ──► Alem
 
 ```
 migration_workspace/
-├── models.py              # SQLAlchemy models (generated + transformed)
+├── models.py              # SQLAlchemy models (with timestamp header)
+├── models_*.py.bak        # Backup of previous models
 ├── alembic.ini            # Alembic configuration
-├── migration_*.sql        # Generated DDL for review
+├── migration_*.sql        # Generated DDL for review (timestamped)
 ├── venv/                  # Isolated Python environment
 └── alembic/
     ├── env.py             # Alembic environment (imports models)
@@ -105,6 +106,12 @@ migration_workspace/
     └── versions/          # Version-controlled migrations
         └── abc123_initial_schema_migration.py
 ```
+
+**models.py header includes:**
+- Generation timestamp
+- Source database and schema
+- Target schema name
+- Tables included in generation
 
 ---
 

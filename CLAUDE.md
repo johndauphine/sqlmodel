@@ -99,13 +99,16 @@ Models are always regenerated from source to capture schema changes:
 
 ```
 scripts/migration_workspace/
-├── venv/           # Python virtual environment
-├── models.py       # SQLAlchemy models
-├── migration.sql   # Generated DDL
-├── alembic.ini     # Alembic config
+├── venv/              # Python virtual environment
+├── models.py          # SQLAlchemy models (with timestamp header)
+├── models_*.py.bak    # Backup of previous models
+├── migration_*.sql    # Generated DDL (timestamped)
+├── alembic.ini        # Alembic config
 └── alembic/
-    └── versions/   # Migration files
+    └── versions/      # Migration files
 ```
+
+models.py includes generation timestamp, source/target info, and tables list in header comment.
 
 ## Model Generation
 

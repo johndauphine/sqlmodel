@@ -98,13 +98,30 @@ After running the migration, the `migration_workspace/` directory contains:
 ```
 migration_workspace/
 ├── venv/                    # Python virtual environment
-├── models.py                # Generated SQLAlchemy models
-├── migration.sql            # Generated DDL
+├── models.py                # Generated SQLAlchemy models (timestamped header)
+├── models_*.py.bak          # Backup of previous models
+├── migration_*.sql          # Generated DDL (timestamped)
 ├── alembic.ini              # Alembic configuration
 └── alembic/
     ├── env.py
     └── versions/            # Migration files
 ```
+
+### models.py Header
+
+Generated models include a header with generation metadata:
+
+```python
+# =============================================================================
+# Auto-generated SQLAlchemy models
+# Generated: 2026-01-26 17:34:43
+# Source: StackOverflow2010.dbo
+# Target: dw__stackoverflow2010__dbo
+# Tables: Users,Posts
+# =============================================================================
+```
+
+Previous versions are backed up as `models_<timestamp>.py.bak` before regeneration.
 
 ## Example Output
 
