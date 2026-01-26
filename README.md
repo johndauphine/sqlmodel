@@ -9,7 +9,8 @@ This toolkit generates SQLAlchemy models from a source PostgreSQL database and c
 **Key Features:**
 - Automated model generation using sqlacodegen
 - Alembic-based schema migrations
-- Lowercase table/column names in target
+- Lowercase table/column/constraint names in target
+- Foreign key relationships preserved and transformed
 - Configurable table selection
 - Idempotent scripts (safe to run multiple times)
 - Rollback support
@@ -126,6 +127,7 @@ Generated models use SQLAlchemy 2.0+ syntax:
 - `DeclarativeBase` pattern
 - Identity columns properly mapped
 - Optional fields using `Optional[]` type hints
+- Foreign key constraints with proper schema references
 
 Example:
 ```python
@@ -136,7 +138,28 @@ class Users(Base):
     Id: Mapped[int] = mapped_column('id', Integer, Identity(), primary_key=True)
     DisplayName: Mapped[str] = mapped_column('displayname', VARCHAR(40), nullable=False)
     Reputation: Mapped[int] = mapped_column('reputation', Integer, nullable=False)
+
+class Posts(Base):
+    __tablename__ = 'posts'
+    __table_args__ = (
+        ForeignKeyConstraint(['owneruserid'], ['dw__stackoverflow2010__dbo.users.id']),
+        {'schema': 'dw__stackoverflow2010__dbo'}
+    )
 ```
+
+## Transformations
+
+The model generation script automatically transforms identifiers for the target database:
+
+| Source | Target |
+|--------|--------|
+| Schema `dbo` | Schema `dw__<database>__<schema>` |
+| Table `Users` | Table `users` |
+| Column `DisplayName` | Column `displayname` |
+| Constraint `PK_Users` | Constraint `pk_users` |
+| FK reference `dbo.Users.Id` | FK reference `dw__<db>__<schema>.users.id` |
+
+Python attribute names are preserved as PascalCase for code readability while database identifiers use lowercase.
 
 ## Idempotency
 
@@ -150,6 +173,42 @@ All scripts are idempotent and can be run multiple times safely:
 - Python 3.10+
 - PostgreSQL with psql client
 - Source and target PostgreSQL databases
+
+## Docker Setup (for testing)
+
+Quick setup using Docker for local testing:
+
+```bash
+# Start PostgreSQL container
+docker run -d --name postgres-migration \
+  -e POSTGRES_PASSWORD=PostgresPassword123 \
+  -p 5433:5432 \
+  postgres:15
+
+# Wait for PostgreSQL to be ready
+until pg_isready -h localhost -p 5433 -U postgres; do sleep 1; done
+
+# Create source and target databases
+PGPASSWORD=PostgresPassword123 psql -h localhost -p 5433 -U postgres <<EOF
+CREATE DATABASE "SourceDB";
+CREATE DATABASE "TargetDB";
+EOF
+
+# Create source schema and tables in SourceDB
+PGPASSWORD=PostgresPassword123 psql -h localhost -p 5433 -U postgres -d SourceDB <<EOF
+CREATE SCHEMA dbo;
+CREATE TABLE dbo."Users" (
+    "Id" SERIAL PRIMARY KEY,
+    "DisplayName" VARCHAR(40) NOT NULL
+);
+EOF
+
+# Update config.env with port 5433, then run migration
+./scripts/migrate-all.sh
+
+# Cleanup when done
+docker stop postgres-migration && docker rm postgres-migration
+```
 
 ## Verification
 
