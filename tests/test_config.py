@@ -54,7 +54,7 @@ class TestDatabaseConfig:
 class TestSmtConfig:
     def test_target_schema_derived(self):
         source = DatabaseConfig(
-            dialect="postgresql", host="h", port=5432,
+            dialect="postgresql", host="db-prod.example.com", port=5432,
             user="u", password="p", database="StackOverflow2010", schema="dbo",
         )
         target = DatabaseConfig(
@@ -62,7 +62,83 @@ class TestSmtConfig:
             user="u", password="p", database="targetdb",
         )
         cfg = SmtConfig(source=source, target=target, tables="all", workspace=Path("."))
-        assert cfg.target_schema == "dw__stackoverflow2010__dbo"
+        assert cfg.target_schema == "db_prod_example_com__stackoverflow2010__dbo"
+
+    def test_target_schema_sanitizes_ip_host(self):
+        # Sanitized host begins with a digit; the derived schema must be prefixed
+        # with `_` so the result is a valid unquoted SQL identifier.
+        source = DatabaseConfig(
+            dialect="postgresql", host="10.0.0.1", port=5432,
+            user="u", password="p", database="src", schema="dbo",
+        )
+        target = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="targetdb",
+        )
+        cfg = SmtConfig(source=source, target=target, tables="all", workspace=Path("."))
+        assert cfg.target_schema == "_10_0_0_1__src__dbo"
+
+    def test_target_schema_override_lowercased(self, caplog):
+        source = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="src", schema="dbo",
+        )
+        target = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="targetdb",
+        )
+        with caplog.at_level("WARNING"):
+            cfg = SmtConfig(
+                source=source, target=target, tables="all", workspace=Path("."),
+                target_schema="MyWarehouse",
+            )
+        assert cfg.target_schema == "mywarehouse"
+        assert "normalized to lowercase" in caplog.text
+
+    def test_target_schema_override_leading_digit_rejected(self):
+        source = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="src", schema="dbo",
+        )
+        target = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="targetdb",
+        )
+        with pytest.raises(ConfigError, match="valid SQL identifier"):
+            SmtConfig(
+                source=source, target=target, tables="all", workspace=Path("."),
+                target_schema="9warehouse",
+            )
+
+    def test_target_schema_explicit_override(self):
+        source = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="src", schema="dbo",
+        )
+        target = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="targetdb",
+        )
+        cfg = SmtConfig(
+            source=source, target=target, tables="all", workspace=Path("."),
+            target_schema="my_custom_schema",
+        )
+        assert cfg.target_schema == "my_custom_schema"
+
+    def test_target_schema_override_invalid_chars_rejected(self):
+        source = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="src", schema="dbo",
+        )
+        target = DatabaseConfig(
+            dialect="postgresql", host="h", port=5432,
+            user="u", password="p", database="targetdb",
+        )
+        with pytest.raises(ConfigError, match="valid SQL identifier"):
+            SmtConfig(
+                source=source, target=target, tables="all", workspace=Path("."),
+                target_schema="bad-name!",
+            )
 
     def test_schema_name_too_long_for_pg(self):
         source = DatabaseConfig(
@@ -86,7 +162,49 @@ class TestLoadConfig:
         assert cfg.source.schema == "dbo"
         assert cfg.target.database == "TargetDB"
         assert cfg.tables == ["Users", "Posts"]
-        assert cfg.target_schema == "dw__sourcedb__dbo"
+        assert cfg.target_schema == "localhost__sourcedb__dbo"
+
+    def test_load_target_schema_override(self, tmp_path: Path):
+        cfg_file = tmp_path / "smt.yaml"
+        cfg_file.write_text("""\
+source:
+  dialect: postgresql
+  host: h
+  user: u
+  password: p
+  database: d
+  schema: dbo
+target:
+  dialect: postgresql
+  host: h
+  user: u
+  password: p
+  database: d
+target_schema: my_warehouse
+""")
+        cfg = load_config(cfg_file)
+        assert cfg.target_schema == "my_warehouse"
+
+    def test_load_target_schema_must_be_string(self, tmp_path: Path):
+        cfg_file = tmp_path / "smt.yaml"
+        cfg_file.write_text("""\
+source:
+  dialect: postgresql
+  host: h
+  user: u
+  password: p
+  database: d
+  schema: dbo
+target:
+  dialect: postgresql
+  host: h
+  user: u
+  password: p
+  database: d
+target_schema: 123
+""")
+        with pytest.raises(ConfigError, match="target_schema"):
+            load_config(cfg_file)
 
     def test_missing_file(self, tmp_path: Path):
         with pytest.raises(ConfigError, match="not found"):

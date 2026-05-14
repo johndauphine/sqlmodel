@@ -57,7 +57,7 @@ tables: [Users, Posts] or "all"
 workspace: ./migration_workspace
 ```
 
-- **Target schema**: Auto-derived as `dw__{source.database}__{source.schema}` (lowercase)
+- **Target schema**: Auto-derived as `{sanitized_source_host}__{source.database}__{source.schema}` (lowercased; non-`[a-z0-9_]` chars in host replaced with `_`). Override with top-level `target_schema:` in the YAML config.
 - **Env var overrides**: `SMT_SOURCE_PASSWORD` and `SMT_TARGET_PASSWORD` override YAML passwords
 - **Schema name validation**: Characters (`[A-Za-z0-9_]+`) and length (PG: 63, MSSQL: 128) validated at load time
 - **Default ports**: postgresql=5432, mssql=1433

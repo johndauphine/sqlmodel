@@ -58,7 +58,9 @@ workspace: ./migration_workspace # Optional (default: ./migration_workspace)
 
 ### Derived Values
 
-**Target schema**: `dw__{source.database.lower()}__{source.schema.lower()}`
+**Target schema**: `{sanitize(source.host)}__{source.database.lower()}__{source.schema.lower()}`
+where `sanitize()` lowercases the host and replaces any character outside `[A-Za-z0-9_]`
+with `_`. Can be overridden with a top-level `target_schema:` field in the YAML config.
 
 ### Validation Rules
 

@@ -74,8 +74,11 @@ tables:                            # list of tables, or "all"
 workspace: ./migration_workspace   # where artifacts are generated
 ```
 
-**Target schema naming**: Automatically derived as `dw__<source_database>__<source_schema>` (lowercase).
-Example: `StackOverflow2010.dbo` becomes `dw__stackoverflow2010__dbo`.
+**Target schema naming**: Automatically derived as `<source_host>__<source_database>__<source_schema>`
+(all lowercased; characters outside `[a-z0-9_]` in the host are replaced with `_`).
+Example: `localhost / StackOverflow2010.dbo` becomes `localhost__stackoverflow2010__dbo`.
+To override, set a top-level `target_schema:` field in your YAML config (useful when the
+auto-derived name exceeds the database's identifier length limit — 63 chars on PostgreSQL).
 
 **Environment variables**: `SMT_SOURCE_PASSWORD` and `SMT_TARGET_PASSWORD` override YAML passwords for CI/CD.
 
@@ -83,11 +86,11 @@ Example: `StackOverflow2010.dbo` becomes `dw__stackoverflow2010__dbo`.
 
 | Source (MSSQL/PostgreSQL) | Target |
 |---------------------------|--------|
-| Schema `dbo` | Schema `dw__<database>__<schema>` |
+| Schema `dbo` | Schema `<host>__<database>__<schema>` |
 | Table `Users` | Table `users` |
 | Column `DisplayName` | Column `displayname` |
 | Constraint `PK_Users` | Constraint `pk_users` |
-| FK `dbo.Users.Id` | FK `dw__<db>__<schema>.users.id` |
+| FK `dbo.Users.Id` | FK `<host>__<db>__<schema>.users.id` |
 
 Python attribute names preserve the original casing (e.g., `Users.DisplayName`) while all database identifiers are lowercase.
 
@@ -146,7 +149,7 @@ smt -c smt.yaml migrate --yes
 
 # Verify
 docker exec smt-postgres psql -U postgres -d stackoverflow \
-  -c "\dt dw__stackoverflow2010__dbo.*"
+  -c "\dt host_docker_internal__stackoverflow2010__dbo.*"  # adjust to match your source host
 
 # Cleanup
 docker stop smt-mssql smt-postgres && docker rm smt-mssql smt-postgres
