@@ -42,6 +42,8 @@ from sqlacodegen.utils import (
     uses_default_name,
 )
 
+from dlt.common.normalizers.naming.sql_ci_v1 import NamingConvention
+
 logger = logging.getLogger(__name__)
 
 # MSSQL type class names that sqlacodegen's MRO walk may not adapt correctly.
@@ -103,6 +105,7 @@ class SmtGenerator(DeclarativeGenerator):
         self.target_schema = target_schema
         self.source_database = source_database
         self.source_schema = source_schema
+        self.naming = NamingConvention(max_length=None)
 
     # ------------------------------------------------------------------
     # Change 1 + 10: Multi-file package output with headers
@@ -333,7 +336,7 @@ class SmtGenerator(DeclarativeGenerator):
     # ------------------------------------------------------------------
 
     def render_class_variables(self, model: ModelClass) -> str:
-        variables = [f"__tablename__ = '{model.table.name.lower()}'"]
+        variables = [f"__tablename__ = '{self.naming.normalize_identifier(model.table.name)}'"]
 
         table_args = self.render_table_args(model.table)
         if table_args:
@@ -376,31 +379,32 @@ class SmtGenerator(DeclarativeGenerator):
 
     def render_constraint(self, constraint: Constraint | ForeignKey) -> str:
         if isinstance(constraint, PrimaryKeyConstraint):
-            # Lowercase column names and constraint name
             col_args = ", ".join(
-                repr(col.name.lower()) for col in constraint.columns
+                repr(self.naming.normalize_identifier(col.name)) for col in constraint.columns
             )
             name = constraint.name
             if name:
                 return render_callable(
-                    "PrimaryKeyConstraint", col_args, kwargs={"name": repr(name.lower())}
+                    "PrimaryKeyConstraint",
+                    col_args,
+                    kwargs={"name": repr(self.naming.normalize_identifier(name))},
                 )
             else:
                 return render_callable("PrimaryKeyConstraint", col_args)
 
         elif isinstance(constraint, ForeignKeyConstraint):
-            # Local columns (lowercase)
-            local_cols = [col.name.lower() for col in constraint.columns]
-            # Remote columns: target_schema.table.column (all lowercase)
+            local_cols = [
+                self.naming.normalize_identifier(col.name) for col in constraint.columns
+            ]
             remote_cols = []
             for fk in constraint.elements:
-                ref_table = fk.column.table.name.lower()
-                ref_col = fk.column.name.lower()
+                ref_table = self.naming.normalize_identifier(fk.column.table.name)
+                ref_col = self.naming.normalize_identifier(fk.column.name)
                 remote_cols.append(f"{self.target_schema}.{ref_table}.{ref_col}")
 
             kwargs: dict[str, Any] = {}
             if constraint.name:
-                kwargs["name"] = repr(constraint.name.lower())
+                kwargs["name"] = repr(self.naming.normalize_identifier(constraint.name))
 
             # Add FK options
             for attr in "ondelete", "onupdate", "deferrable", "initially", "match":
@@ -416,9 +420,8 @@ class SmtGenerator(DeclarativeGenerator):
             )
 
         elif isinstance(constraint, ForeignKey):
-            # Single FK reference — rewrite to target schema
-            ref_table = constraint.column.table.name.lower()
-            ref_col = constraint.column.name.lower()
+            ref_table = self.naming.normalize_identifier(constraint.column.table.name)
+            ref_col = self.naming.normalize_identifier(constraint.column.name)
             remote = f"{self.target_schema}.{ref_table}.{ref_col}"
             return render_callable("ForeignKey", repr(remote))
 
@@ -432,13 +435,11 @@ class SmtGenerator(DeclarativeGenerator):
 
     def render_column_attribute(self, column_attr: ColumnAttribute) -> str:
         column = column_attr.column
-        col_name_lower = column.name.lower()
+        col_db_name = self.naming.normalize_identifier(column.name)
 
-        # Render Python type hint
         rendered_python_type = self.render_column_python_type(column)
 
-        # Build mapped_column args
-        args: list[str] = [repr(col_name_lower)]  # always show name (lowercase)
+        args: list[str] = [repr(col_db_name)]
         kwargs: dict[str, Any] = {}
 
         # Column type
