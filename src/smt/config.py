@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -81,25 +81,33 @@ class DatabaseConfig:
         return self.get_url().render_as_string(hide_password=False)
 
 
+def _sanitize_identifier(value: str) -> str:
+    """Lowercase and replace any non-[A-Za-z0-9_] characters with underscores."""
+    return re.sub(r"[^A-Za-z0-9_]", "_", value).lower()
+
+
 @dataclass
 class SmtConfig:
     source: DatabaseConfig
     target: DatabaseConfig
     tables: list[str] | Literal["all"]
     workspace: Path
-    target_schema: str = field(init=False)
+    target_schema: str | None = None
 
     def __post_init__(self):
-        self.target_schema = (
-            f"dw__{self.source.database.lower()}__{self.source.schema.lower()}"
-        )
+        if self.target_schema is None:
+            self.target_schema = (
+                f"{_sanitize_identifier(self.source.host)}"
+                f"__{self.source.database.lower()}"
+                f"__{self.source.schema.lower()}"
+            )
         self._validate_schema_name_chars()
         self._validate_schema_name_length()
 
     def _validate_schema_name_chars(self):
         if not re.match(r"^[A-Za-z0-9_]+$", self.target_schema):
             raise ConfigError(
-                f"Derived target schema '{self.target_schema}' contains invalid characters. "
+                f"Target schema '{self.target_schema}' contains invalid characters. "
                 f"Only alphanumeric characters and underscores are allowed."
             )
 
@@ -107,9 +115,9 @@ class SmtConfig:
         limit = IDENTIFIER_LENGTH_LIMITS.get(self.target.dialect)
         if limit and len(self.target_schema) > limit:
             raise ConfigError(
-                f"Derived target schema '{self.target_schema}' is {len(self.target_schema)} chars, "
+                f"Target schema '{self.target_schema}' is {len(self.target_schema)} chars, "
                 f"exceeding {self.target.dialect} identifier limit of {limit}. "
-                f"Use shorter source database/schema names."
+                f"Set 'target_schema:' explicitly in the config to override the default."
             )
 
 
@@ -187,9 +195,17 @@ def load_config(path: str | Path) -> SmtConfig:
     # Parse workspace
     workspace = Path(data.get("workspace", "./migration_workspace"))
 
+    # Optional explicit target_schema override
+    target_schema = data.get("target_schema")
+    if target_schema is not None and not isinstance(target_schema, str):
+        raise ConfigError(
+            f"'target_schema' must be a string, got: {type(target_schema).__name__}"
+        )
+
     return SmtConfig(
         source=source,
         target=target,
         tables=tables,
         workspace=workspace,
+        target_schema=target_schema,
     )

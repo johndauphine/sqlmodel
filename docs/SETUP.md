@@ -245,9 +245,9 @@ smt -c smt.yaml migrate --yes
 ### Verify
 
 ```bash
-# Check tables in target
+# Check tables in target (replace <host> with the sanitized source host segment, e.g. localhost)
 docker exec smt-postgres psql -U postgres -d stackoverflow \
-  -c "\dt dw__stackoverflow2010__dbo.*"
+  -c "\dt <host>__stackoverflow2010__dbo.*"
 
 # Check migration status
 smt -c smt.yaml status
@@ -310,8 +310,16 @@ python -c "import pyodbc; print(pyodbc.drivers())"
 ### Schema Name Too Long
 
 ```
-ConfigError: Derived target schema 'dw__verylongdatabasename__verylongschema' is 45 chars,
-exceeding postgresql identifier limit of 63.
+ConfigError: Target schema 'db_prod_long_host_example_com__verylongdatabasename__verylongschema'
+is 78 chars, exceeding postgresql identifier limit of 63.
+Set 'target_schema:' explicitly in the config to override the default.
 ```
 
-Use shorter source database or schema names. The derived name is `dw__` + database + `__` + schema (all lowercase).
+The auto-derived name is `<sanitized_source_host>__<database>__<schema>` (all lowercase; non-`[a-z0-9_]`
+characters in the host are replaced with `_`). PostgreSQL caps identifiers at 63 characters.
+Either use shorter source values, or set a top-level `target_schema:` field in `smt.yaml` to pick the
+schema name explicitly:
+
+```yaml
+target_schema: my_warehouse
+```

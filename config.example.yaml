@@ -18,8 +18,10 @@ source:
 # =============================================================================
 # Target Database
 # =============================================================================
-# Target schema is auto-derived as: dw__<source_database>__<source_schema> (lowercase)
-# Example: dw__stackoverflow2010__dbo
+# Target schema is auto-derived as: <source_host>__<source_database>__<source_schema>
+# (all lowercased; characters outside [a-z0-9_] in the host are replaced with _)
+# Example: localhost__stackoverflow2010__dbo
+# To override, set the top-level `target_schema:` field below.
 target:
   dialect: postgresql
   # driver: psycopg2
@@ -28,6 +30,12 @@ target:
   user: postgres
   password: YourPassword    # or set SMT_TARGET_PASSWORD env var
   database: stackoverflow
+
+# =============================================================================
+# Target Schema (optional)
+# =============================================================================
+# Uncomment to override the auto-derived target schema name.
+# target_schema: my_custom_schema
 
 # =============================================================================
 # Tables to Migrate
