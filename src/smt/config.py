@@ -82,8 +82,13 @@ class DatabaseConfig:
 
 
 def _sanitize_identifier(value: str) -> str:
-    """Lowercase and replace any non-[A-Za-z0-9_] characters with underscores."""
-    return re.sub(r"[^A-Za-z0-9_]", "_", value).lower()
+    """Lowercase, replace non-[A-Za-z0-9_] chars with `_`, and ensure a non-digit
+    leading character so the result is a valid unquoted SQL identifier (PG/MSSQL
+    require identifiers to start with a letter or underscore)."""
+    cleaned = re.sub(r"[^A-Za-z0-9_]", "_", value).lower()
+    if cleaned and cleaned[0].isdigit():
+        cleaned = "_" + cleaned
+    return cleaned
 
 
 @dataclass
@@ -101,14 +106,30 @@ class SmtConfig:
                 f"__{self.source.database.lower()}"
                 f"__{self.source.schema.lower()}"
             )
+        else:
+            # Normalize explicit overrides to lowercase so the value we pass to
+            # schema DDL (unquoted) matches what SQLAlchemy/Alembic reflect back.
+            # PG folds unquoted identifiers to lowercase; mixed case would cause
+            # the create_schema DDL and metadata.schema to refer to different
+            # schemas downstream.
+            lowered = self.target_schema.lower()
+            if lowered != self.target_schema:
+                logger.warning(
+                    "target_schema '%s' normalized to lowercase '%s'",
+                    self.target_schema, lowered,
+                )
+                self.target_schema = lowered
         self._validate_schema_name_chars()
         self._validate_schema_name_length()
 
     def _validate_schema_name_chars(self):
-        if not re.match(r"^[A-Za-z0-9_]+$", self.target_schema):
+        # SQL identifiers must start with a letter or underscore and contain only
+        # alphanumerics or underscores thereafter.
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", self.target_schema):
             raise ConfigError(
-                f"Target schema '{self.target_schema}' contains invalid characters. "
-                f"Only alphanumeric characters and underscores are allowed."
+                f"Target schema '{self.target_schema}' is not a valid SQL identifier. "
+                f"Must start with a letter or underscore and contain only alphanumeric "
+                f"characters or underscores."
             )
 
     def _validate_schema_name_length(self):
