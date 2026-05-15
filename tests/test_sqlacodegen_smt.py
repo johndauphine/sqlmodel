@@ -582,3 +582,90 @@ class TestSmtGeneratorUniqueConstraint:
         content = files["users.py"]
         assert "UniqueConstraint" in content
         assert "uq_users_email" in content.lower()
+
+
+class TestSmtGeneratorDltNormalization:
+    """Regressions surfaced by codex review of the dlt-naming change."""
+
+    def test_double_underscore_preserved_in_tablename(self):
+        """Source table `orders__items` keeps the `__` separator (dlt path-aware)."""
+        gen = _make_generator({
+            "orders__items": {
+                "columns": [Column("Id", Integer, primary_key=True)],
+                "constraints": [PrimaryKeyConstraint("Id")],
+            },
+        })
+        files = gen.generate()
+
+        assert "orders__items.py" in files
+        content = files["orders__items.py"]
+        assert "__tablename__ = 'orders__items'" in content
+
+    def test_double_underscore_preserved_in_fk_target(self):
+        """FK ref to a `__`-bearing table preserves the separator in the target ref."""
+        gen = _make_generator({
+            "users__archive": {
+                "columns": [Column("Id", Integer, primary_key=True)],
+                "constraints": [PrimaryKeyConstraint("Id")],
+            },
+            "Posts": {
+                "columns": [
+                    Column("Id", Integer, primary_key=True),
+                    Column("UserId", Integer, nullable=False),
+                ],
+                "constraints": [
+                    PrimaryKeyConstraint("Id"),
+                    ForeignKeyConstraint(
+                        ["UserId"],
+                        ["dbo.users__archive.Id"],
+                        name="FK_Posts_UsersArchive",
+                    ),
+                ],
+            },
+        })
+        files = gen.generate()
+        content = files["posts.py"]
+        assert "dw__testdb__dbo.users__archive.id" in content
+
+    def test_unique_constraint_refs_match_normalized_columns(self):
+        """UniqueConstraint column refs use the same normalized DB name as the column.
+
+        Without this, columns whose normalized form differs from the original
+        (e.g. trailing-underscore stripping by dlt) leave the constraint pointing
+        at a non-existent column, raising ConstraintColumnNotFoundError on import.
+        """
+        gen = _make_generator({
+            "Widgets": {
+                "columns": [
+                    Column("Id", Integer, primary_key=True),
+                    Column("foo_", String(20), nullable=False),
+                ],
+                "constraints": [
+                    PrimaryKeyConstraint("Id"),
+                    UniqueConstraint("foo_", name="uq_widgets_foo"),
+                ],
+            },
+        })
+        files = gen.generate()
+        content = files["widgets.py"]
+
+        assert "mapped_column('foo'," in content
+        assert "UniqueConstraint('foo'" in content
+        assert "'foo_'" not in content
+
+    def test_db_name_collision_raises(self):
+        """Two source columns whose normalized DB names collide raise ValueError."""
+        import pytest
+
+        gen = _make_generator({
+            "Widgets": {
+                "columns": [
+                    Column("Id", Integer, primary_key=True),
+                    Column("foo", String(20), nullable=False),
+                    Column("foo_", String(20), nullable=False),
+                ],
+                "constraints": [PrimaryKeyConstraint("Id")],
+            },
+        })
+        with pytest.raises(ValueError, match="Column name collision"):
+            gen.generate()

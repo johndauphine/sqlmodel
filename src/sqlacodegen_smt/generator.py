@@ -107,6 +107,31 @@ class SmtGenerator(DeclarativeGenerator):
         self.source_schema = source_schema
         self.naming = NamingConvention(max_length=None)
 
+    def _normalize(self, name: str) -> str:
+        # `normalize_tables_path` preserves `__` segments and trailing-underscore stripping
+        # only inside each segment, so a source table literally named `orders__items` keeps
+        # the double underscore. Using this for *all* identifiers (tables, columns,
+        # constraint names) keeps refs consistent within a model.
+        return self.naming.normalize_tables_path(name)
+
+    def _check_db_name_collisions(self, model: ModelClass) -> None:
+        # dlt normalization can map two distinct source names to the same DB name
+        # (e.g. `foo` and `foo_` both become `foo`). Emitting both would produce a
+        # SQLAlchemy DuplicateColumnError at model import — surface it here with
+        # a clear, actionable message instead.
+        seen: dict[str, str] = {}
+        for column_attr in model.columns:
+            original = column_attr.column.name
+            db_name = self._normalize(original)
+            if db_name in seen and seen[db_name] != original:
+                raise ValueError(
+                    f"Column name collision in table '{model.table.name}': "
+                    f"'{seen[db_name]}' and '{original}' both normalize to "
+                    f"'{db_name}'. Rename one column at the source or override "
+                    f"the naming convention."
+                )
+            seen[db_name] = original
+
     # ------------------------------------------------------------------
     # Change 1 + 10: Multi-file package output with headers
     # ------------------------------------------------------------------
@@ -144,6 +169,7 @@ class SmtGenerator(DeclarativeGenerator):
         # Per-table files
         model_classes = [m for m in models if isinstance(m, ModelClass)]
         for model in model_classes:
+            self._check_db_name_collisions(model)
             filename = self._get_table_module_name(model.table.name) + ".py"
             files[filename] = self._generate_table_file(model)
 
@@ -336,7 +362,7 @@ class SmtGenerator(DeclarativeGenerator):
     # ------------------------------------------------------------------
 
     def render_class_variables(self, model: ModelClass) -> str:
-        variables = [f"__tablename__ = '{self.naming.normalize_identifier(model.table.name)}'"]
+        variables = [f"__tablename__ = '{self._normalize(model.table.name)}'"]
 
         table_args = self.render_table_args(model.table)
         if table_args:
@@ -380,31 +406,31 @@ class SmtGenerator(DeclarativeGenerator):
     def render_constraint(self, constraint: Constraint | ForeignKey) -> str:
         if isinstance(constraint, PrimaryKeyConstraint):
             col_args = ", ".join(
-                repr(self.naming.normalize_identifier(col.name)) for col in constraint.columns
+                repr(self._normalize(col.name)) for col in constraint.columns
             )
             name = constraint.name
             if name:
                 return render_callable(
                     "PrimaryKeyConstraint",
                     col_args,
-                    kwargs={"name": repr(self.naming.normalize_identifier(name))},
+                    kwargs={"name": repr(self._normalize(name))},
                 )
             else:
                 return render_callable("PrimaryKeyConstraint", col_args)
 
         elif isinstance(constraint, ForeignKeyConstraint):
             local_cols = [
-                self.naming.normalize_identifier(col.name) for col in constraint.columns
+                self._normalize(col.name) for col in constraint.columns
             ]
             remote_cols = []
             for fk in constraint.elements:
-                ref_table = self.naming.normalize_identifier(fk.column.table.name)
-                ref_col = self.naming.normalize_identifier(fk.column.name)
+                ref_table = self._normalize(fk.column.table.name)
+                ref_col = self._normalize(fk.column.name)
                 remote_cols.append(f"{self.target_schema}.{ref_table}.{ref_col}")
 
             kwargs: dict[str, Any] = {}
             if constraint.name:
-                kwargs["name"] = repr(self.naming.normalize_identifier(constraint.name))
+                kwargs["name"] = repr(self._normalize(constraint.name))
 
             # Add FK options
             for attr in "ondelete", "onupdate", "deferrable", "initially", "match":
@@ -420,13 +446,23 @@ class SmtGenerator(DeclarativeGenerator):
             )
 
         elif isinstance(constraint, ForeignKey):
-            ref_table = self.naming.normalize_identifier(constraint.column.table.name)
-            ref_col = self.naming.normalize_identifier(constraint.column.name)
+            ref_table = self._normalize(constraint.column.table.name)
+            ref_col = self._normalize(constraint.column.name)
             remote = f"{self.target_schema}.{ref_table}.{ref_col}"
             return render_callable("ForeignKey", repr(remote))
 
+        elif isinstance(constraint, UniqueConstraint):
+            # Must render here (not via super) so column refs use the same
+            # normalized names emitted on the columns themselves; otherwise the
+            # generated model fails to import with ConstraintColumnNotFoundError
+            # for columns whose normalized form differs from the original.
+            col_args = [repr(self._normalize(col.name)) for col in constraint.columns]
+            kwargs: dict[str, Any] = {}
+            if constraint.name and not uses_default_name(constraint):
+                kwargs["name"] = repr(self._normalize(constraint.name))
+            return render_callable("UniqueConstraint", *col_args, kwargs=kwargs)
+
         else:
-            # Fall back to parent for other constraints
             return super().render_constraint(constraint)
 
     # ------------------------------------------------------------------
@@ -435,7 +471,7 @@ class SmtGenerator(DeclarativeGenerator):
 
     def render_column_attribute(self, column_attr: ColumnAttribute) -> str:
         column = column_attr.column
-        col_db_name = self.naming.normalize_identifier(column.name)
+        col_db_name = self._normalize(column.name)
 
         rendered_python_type = self.render_column_python_type(column)
 
